@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "XCountery",
+  "description": "X/Twitter country reveal on hover",
+  "version": "0.1.0",
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://x.com/*"
+  ],
+  "permissions": [
+    "storage",
+    "cookies",
+    "webRequest"
+  ]
+}
+
