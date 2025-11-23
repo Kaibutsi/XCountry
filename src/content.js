@@ -1,5 +1,6 @@
 (async () => {
-    const Query = 'a[role="link"][tabindex="-1"]:not(:has([handled])) span';
+    const Query = '[data-testid="User-Name"] [tabindex="-1"]:not(:has([handled])) span';
+    const Lifetime = 1000 * 60 * 12; // 12 hours, I don't know how often X updates their accuracy
 
     const Bearer = await GetFromBackground("Bearer");
     const CSRF = await GetFromBackground("CSRF");
@@ -8,15 +9,44 @@
     const Rates = await CreateStorageProxy("X_Rates");
 
     Delegate("mouseover", Query, async (e) => {
-        if(GetRates().Amount === 0) return;
+        if (GetRates().Amount === 0) return;
+
+        const handle = e.innerHTML.substring(1);
         
-        e.setAttribute("handled", "true");
-        const result = await HandleHover(e.innerHTML.substring(1));
-        e.innerHTML += result;
+        await GetCountryHTML(handle, true); // actually fetch data
+        await UpdateAll();
     });
+
+    // being very lazy for now
+    new MutationObserver(() => UpdateAll()).observe(document.body, {childList: true, subtree: true});
+
+    document.body.insertAdjacentHTML('beforebegin', '<div id="x-country-counter" style="position: fixed; border-radius: 6px; font-size: 12px; pointer-events: none; font-weight: bold; background: #222; padding: 10px; top: 16px; left: 16px;"></div>')
+    const Counter = document.querySelector('#x-country-counter');
+    setInterval(() => {
+        const rates = GetRates();
+        Counter.style.display = rates.Amount <= 10 ? 'block' : 'none';
+        Counter.innerHTML = `Country Reveal<br/>Remaining: ${rates.Amount}<br/>Resets in: ${Math.floor((rates.Time - Date.now()) / (1000))} seconds`;
+    }, 1000);
     
-    
-    
+    // a very lazy approach since we're querying the entire dom all the time.
+    // but do we even care? this means we don't have to handle a bunch of edge cases and syncing and refreshing stuff
+    async function UpdateAll()
+    {
+        for(const entry of document.querySelectorAll(Query))
+        {
+            const handle = entry.innerHTML.substring(1);
+            const result = await GetCountryHTML(handle,false);
+            
+            if(entry.matches('[handled]')) return; // weird edge case
+            
+            if(result)
+            {
+                entry.setAttribute('handled', 'handled');
+                entry.innerHTML += result;
+            }
+        }    
+    }
+
     function Delegate(type, query, callback) {
         document.body.addEventListener(type, function (event) {
             const target = event.target.closest(query);
@@ -75,29 +105,7 @@
     
     async function GetInfo(target) {
         const result = await fetch(`https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=%7B%22screenName%22%3A%22${target}%22%7D`, {
-            "headers": {
-                "accept": "*/*",
-                "accept-language": "en-GB,en;q=0.6",
-                "authorization": Bearer,
-                "content-type": "application/json",
-                "priority": "u=1, i",
-                "sec-ch-ua": "\"Chromium\";v=\"142\", \"Brave\";v=\"142\", \"Not_A Brand\";v=\"99\"",
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": "\"Windows\"",
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-origin",
-                "sec-gpc": "1",
-                "x-csrf-token": CSRF,
-                "x-twitter-active-user": "yes",
-                "x-twitter-auth-type": "OAuth2Session",
-                "x-twitter-client-language": "en"
-            },
-            "referrer": `https://x.com/${target}/about`,
-            "body": null,
-            "method": "GET",
-            "mode": "cors",
-            "credentials": "include"
+            "headers": { "accept": "*/*", "authorization": Bearer, "x-csrf-token": CSRF }
         });
 
         try {
@@ -120,21 +128,28 @@
         return null;
     }
 
-    async function HandleHover(target) {
-        if (!Countries[target]) {
-            const info = await GetInfo(target);
+    async function VerifyHandle(handle) {
+        let country = Countries[handle];
+        
+        if (!country || Date.now() - country.CacheDate > Lifetime) {
+            const info = await GetInfo(handle);
             if (!info) return;
 
             Rates.Remaining = info.Remaining;
             Rates.ResetEpoch = info.ResetEpoch;
 
-            Countries[target] = {Country: info.Country, Accurate: info.Accurate};
+            Countries[handle] = {Country: info.Country, Accurate: info.Accurate, CacheDate: Date.now()};
         }
-
-        const country = Countries[target];
+    }
+    
+    async function GetCountryHTML(handle, fetch)
+    {
+        if(fetch) await VerifyHandle(handle);
         
-        const color = country.Accurate ? "#771b0c" : "#04b145";
+        const country = Countries[handle];
+        if(!country) return null;
+
+        const color = country.Accurate ? "#1a8cd8" : "#602c2c";
         return ` <span style="color: ${color}">${country.Country}</span>`;
     }
 })();
-

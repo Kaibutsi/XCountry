@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "XCountery",
-  "description": "X/Twitter country reveal on hover",
-  "version": "0.1.0",
+  "name": "XCountry",
+  "description": "X country reveal.",
+  "version": "0.0.1",
   "background": {
     "service_worker": "src/background.js"
   },
