@@ -1,6 +1,6 @@
 (async () => {
     const Query = '[data-testid="User-Name"] [tabindex="-1"]:not(:has([handled])) span';
-    const Lifetime = 1000 * 60 * 12; // 12 hours, I don't know how often X updates their accuracy
+    const Lifetime = 1000 * 60 * 60 * 12; // 12 hours, I don't know how often X updates their accuracy
 
     const Bearer = await GetFromBackground("Bearer");
     const CSRF = await GetFromBackground("CSRF");
